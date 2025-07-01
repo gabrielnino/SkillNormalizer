@@ -162,6 +162,36 @@ def normalize_skills(input_file: str, output_file: str) -> None:
 
     save_results(output_file, final_groups)
 
+# (Todo el código anterior sin cambios...)
+
+def save_categories_summary(final_groups: Dict[str, List[str]], output_path: str) -> None:
+    """Save a human-readable summary of categories and their skills."""
+    try:
+        with open(output_path, 'w', encoding='utf-8') as f:
+            for category, skills in sorted(final_groups.items()):
+                f.write(f"[{category}] - {len(skills)} skills\n")
+                for skill in sorted(skills):
+                    f.write(f"  - {skill}\n")
+                f.write("\n")
+        logger.info(f"Category summary saved to {output_path}")
+    except IOError as e:
+        logger.error(f"Failed to write category summary file: {e}")
+
+
+def normalize_skills(input_file: str, output_file: str, summary_file: str) -> None:
+    """Main function to process skills from input file and save results."""
+    logger.info(f"Extracting skills from {input_file}")
+    skills = extract_all_skill_names_from_jobs(input_file)
+
+    logger.info("Creating initial groups")
+    groups = create_initial_groups(skills)
+
+    logger.info("Consolidating groups")
+    final_groups = consolidate_groups(groups)
+
+    save_results(output_file, final_groups)
+    save_categories_summary(final_groups, summary_file)
+
 
 if __name__ == "__main__":
     import argparse
@@ -171,7 +201,9 @@ if __name__ == "__main__":
                         help=f"Input JSON file (default: {DEFAULT_INPUT})")
     parser.add_argument("-o", "--output", default=DEFAULT_OUTPUT,
                         help=f"Output JSON file (default: {DEFAULT_OUTPUT})")
+    parser.add_argument("-s", "--summary", default="output_categories.txt",
+                        help="Output text file for category summary")
 
     args = parser.parse_args()
 
-    normalize_skills(args.input, args.output)
+    normalize_skills(args.input, args.output, args.summary)
