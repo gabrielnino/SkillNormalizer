@@ -1,7 +1,6 @@
 import re
 import json
 import sys
-import pandas as pd
 from difflib import SequenceMatcher
 
 def normalize_text(text):
