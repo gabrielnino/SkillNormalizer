@@ -18,10 +18,15 @@ MIN_GROUP_SIZE = 3
 SIMILARITY_THRESHOLD = 0.8
 DEFAULT_INPUT = "processed_parse_jobs.json"
 DEFAULT_OUTPUT = "normalized_skills.json"
+DEFAULT_SUMMARY = "output_categories.txt"
 
-# Categories
+# Logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Main Categories
 MAIN_CATEGORIES = {
-    '.NET': ['c#', 'dotnet', 'aspdotnet', 'vbnet', 'wpf', 'winforms', 'entity framework'],
+    '.NET': ['dotnet', 'csharp', 'aspdotnet', 'vbnet', 'wpf', 'winforms', 'entityframework'],
     'CLOUD_AWS': ['aws', 'lambda', 's3', 'cloudfront', 'dynamodb'],
     'CLOUD_AZURE': ['azure', 'functions', 'entra', 'sql database'],
     'CLOUD_GCP': ['gcp', 'google cloud'],
@@ -42,18 +47,28 @@ NON_TECH_CATEGORIES = {
     'EDUCATION': ['teaching', 'tutoring', 'curriculum']
 }
 
-# Logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Aliases for normalization
+CATEGORY_ALIASES = {
+    "aspnetmvc": "dotnet",
+    "aspnetcore": "dotnet",
+    "dotnetcore": "dotnet",
+    "netcore": "dotnet",
+    "net": "dotnet",
+    "entityframework": "dotnet",
+    "c#": "dotnet",
+    "csharp": "dotnet",
+    "ts": "typescript",
+    "js": "javascript",
+    "py": "python"
+}
 
 
 def extract_all_skill_names_from_jobs(file_path: str) -> List[str]:
-    """Extracts all unique skill names from various sections in job postings."""
+    """Extracts all unique skill names from job postings."""
     with open(file_path, 'r') as f:
         data = json.load(f)
 
     skills = set()
-
     for job in data:
         for key in ['KeySkillsRequired', 'EssentialQualifications',
                     'EssentialTechnicalSkillQualifications', 'OtherTechnicalSkillQualifications']:
@@ -64,23 +79,27 @@ def extract_all_skill_names_from_jobs(file_path: str) -> List[str]:
     return list(skills)
 
 
-def save_results(output_file: str, results: Dict[str, List[str]]) -> None:
-    """Save normalized skills to JSON output file."""
-    try:
-        with open(output_file, 'w') as f:
-            json.dump(results, f, indent=2)
-        logger.info(f"Results saved to {output_file}")
-    except IOError as e:
-        logger.error(f"Failed to write output file: {e}")
-        sys.exit(1)
-
-
 def normalize_skill(skill_name: str) -> str:
     """Normalizes skill name by standardizing format and removing noise."""
     skill = skill_name.lower().strip()
-    skill = re.sub(r"[^a-z0-9]", "", skill)
+
+    # Filtrar frases que no son habilidades
+    if any(kw in skill for kw in ["years of experience", "ability to", "demonstrated experience", "track record", "responsible for"]):
+        return ""
+
     skill = skill.replace(".net", "dotnet").replace("c#", "csharp")
+    skill = re.sub(r"[^a-z0-9]+", "", skill)  # quitar caracteres no alfanuméricos
+
+    # Aplicar alias si existe
+    if skill in CATEGORY_ALIASES:
+        skill = CATEGORY_ALIASES[skill]
+
     return skill
+
+
+def is_valid_group_name(name: str) -> bool:
+    """Returns False if name is a long sentence or irrelevant."""
+    return len(name.split()) <= 5 and len(name.strip()) >= 3
 
 
 def is_technical(skill: str) -> bool:
@@ -93,6 +112,8 @@ def is_technical(skill: str) -> bool:
 def should_group_together(a: str, b: str) -> bool:
     """Checks if two skills should be grouped based on similarity."""
     norm_a, norm_b = normalize_skill(a), normalize_skill(b)
+    if not norm_a or not norm_b:
+        return False
     if norm_a in norm_b or norm_b in norm_a:
         return True
     if norm_a[:4] == norm_b[:4]:
@@ -118,6 +139,9 @@ def create_initial_groups(skills: List[str]) -> Dict[str, List[str]]:
     skills_sorted = sorted(skills, key=len, reverse=True)
 
     for skill in tqdm(skills_sorted, desc="Grouping skills"):
+        if not is_valid_group_name(skill):
+            continue
+
         matched = False
         for group_name in groups:
             if should_group_together(skill, group_name):
@@ -142,27 +166,22 @@ def consolidate_groups(groups: Dict[str, List[str]]) -> Dict[str, List[str]]:
         else:
             consolidated[group_name] = skills
 
-    # Deduplicate and sort
     return {
         k: sorted(list(set(v)))
         for k, v in consolidated.items()
     }
 
 
-def normalize_skills(input_file: str, output_file: str) -> None:
-    """Main function to process skills from input file and save results."""
-    logger.info(f"Extracting skills from {input_file}")
-    skills = extract_all_skill_names_from_jobs(input_file)
+def save_results(output_file: str, results: Dict[str, List[str]]) -> None:
+    """Save normalized skills to JSON output file."""
+    try:
+        with open(output_file, 'w') as f:
+            json.dump(results, f, indent=2)
+        logger.info(f"Results saved to {output_file}")
+    except IOError as e:
+        logger.error(f"Failed to write output file: {e}")
+        sys.exit(1)
 
-    logger.info("Creating initial groups")
-    groups = create_initial_groups(skills)
-
-    logger.info("Consolidating groups")
-    final_groups = consolidate_groups(groups)
-
-    save_results(output_file, final_groups)
-
-# (Todo el código anterior sin cambios...)
 
 def save_categories_summary(final_groups: Dict[str, List[str]], output_path: str) -> None:
     """Save a human-readable summary of categories and their skills."""
@@ -197,12 +216,9 @@ if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Skill Normalization Tool")
-    parser.add_argument("-i", "--input", default=DEFAULT_INPUT,
-                        help=f"Input JSON file (default: {DEFAULT_INPUT})")
-    parser.add_argument("-o", "--output", default=DEFAULT_OUTPUT,
-                        help=f"Output JSON file (default: {DEFAULT_OUTPUT})")
-    parser.add_argument("-s", "--summary", default="output_categories.txt",
-                        help="Output text file for category summary")
+    parser.add_argument("-i", "--input", default=DEFAULT_INPUT, help="Input JSON file")
+    parser.add_argument("-o", "--output", default=DEFAULT_OUTPUT, help="Output grouped JSON file")
+    parser.add_argument("-s", "--summary", default=DEFAULT_SUMMARY, help="Output readable summary file")
 
     args = parser.parse_args()
 
