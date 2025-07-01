@@ -1,15 +1,25 @@
+"""
+Skill normalization module for grouping and categorizing skills based on semantic similarity.
+Supports file input/output operations with JSON format from job postings.
+"""
 
-import re
 import json
+import logging
+import re
 import sys
 from difflib import SequenceMatcher
-from collections import defaultdict
+from pathlib import Path
+from typing import Dict, List, Optional, Set, Tuple
 
-# Configuration
-MIN_GROUP_SIZE = 5
+from tqdm import tqdm
+
+# Constants
+MIN_GROUP_SIZE = 3
 SIMILARITY_THRESHOLD = 0.8
+DEFAULT_INPUT = "processed_parse_jobs.json"
+DEFAULT_OUTPUT = "normalized_skills.json"
 
-# Main categories and keywords
+# Categories
 MAIN_CATEGORIES = {
     '.NET': ['c#', 'dotnet', 'aspdotnet', 'vbnet', 'wpf', 'winforms', 'entity framework'],
     'CLOUD_AWS': ['aws', 'lambda', 's3', 'cloudfront', 'dynamodb'],
@@ -32,96 +42,136 @@ NON_TECH_CATEGORIES = {
     'EDUCATION': ['teaching', 'tutoring', 'curriculum']
 }
 
-def normalize_skill(skill_name):
-    skill = str(skill_name).lower().strip()
-    replacements = {
-        r'\.net': 'dotnet', r'asp\.net': 'aspdotnet', r'\bc#\b': 'csharp',
-        r'\bc\+\+\b': 'cpp', r'react\.?js\b': 'react', r'angular\.?js\b': 'angular',
-        r'node\.?js\b': 'node', r'typescript': 'javascript',
-        r'mssql|sql server': 'sqlserver', r'postgresql': 'postgres',
-        r'nosql': 'mongodb', r'rest\s?api': 'api', r'web\s?api': 'api',
-        r'aws\s.*': 'aws', r'azure\s.*': 'azure'
-    }
-    for pattern, replacement in replacements.items():
-        skill = re.sub(pattern, replacement, skill)
-    skill = re.sub(r'[^a-z0-9]', ' ', skill)
-    skill = re.sub(r'\s+', ' ', skill).strip()
-    stop_words = {'development', 'programming', 'framework', 'language',
-                  'experience', 'knowledge', 'using', 'with', 'and', 'or', 'skills'}
-    words = [word for word in skill.split() if word not in stop_words and len(word) > 2]
-    return ' '.join(words)
+# Logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-def is_technical(skill):
-    non_tech_keywords = {'sales', 'customer', 'teaching', 'medical', 'warehouse'}
-    return not any(keyword in skill for keyword in non_tech_keywords)
 
-def should_group_together(a, b):
-    a_norm = normalize_skill(a)
-    b_norm = normalize_skill(b)
-    if a_norm in b_norm or b_norm in a_norm:
+def extract_all_skill_names_from_jobs(file_path: str) -> List[str]:
+    """Extracts all unique skill names from various sections in job postings."""
+    with open(file_path, 'r') as f:
+        data = json.load(f)
+
+    skills = set()
+
+    for job in data:
+        for key in ['KeySkillsRequired', 'EssentialQualifications',
+                    'EssentialTechnicalSkillQualifications', 'OtherTechnicalSkillQualifications']:
+            for skill in job.get(key, []):
+                name = skill.get('Name')
+                if name:
+                    skills.add(name.strip())
+    return list(skills)
+
+
+def save_results(output_file: str, results: Dict[str, List[str]]) -> None:
+    """Save normalized skills to JSON output file."""
+    try:
+        with open(output_file, 'w') as f:
+            json.dump(results, f, indent=2)
+        logger.info(f"Results saved to {output_file}")
+    except IOError as e:
+        logger.error(f"Failed to write output file: {e}")
+        sys.exit(1)
+
+
+def normalize_skill(skill_name: str) -> str:
+    """Normalizes skill name by standardizing format and removing noise."""
+    skill = skill_name.lower().strip()
+    skill = re.sub(r"[^a-z0-9]", "", skill)
+    skill = skill.replace(".net", "dotnet").replace("c#", "csharp")
+    return skill
+
+
+def is_technical(skill: str) -> bool:
+    """Determines if a skill is technical based on category keywords."""
+    norm_skill = normalize_skill(skill)
+    tech_keywords = {kw for cat in MAIN_CATEGORIES.values() for kw in cat}
+    return any(kw in norm_skill for kw in tech_keywords)
+
+
+def should_group_together(a: str, b: str) -> bool:
+    """Checks if two skills should be grouped based on similarity."""
+    norm_a, norm_b = normalize_skill(a), normalize_skill(b)
+    if norm_a in norm_b or norm_b in norm_a:
         return True
-    if len(a_norm) >= 4 and len(b_norm) >= 4 and a_norm[:4] == b_norm[:4]:
+    if norm_a[:4] == norm_b[:4]:
         return True
-    return SequenceMatcher(None, a_norm, b_norm).ratio() > SIMILARITY_THRESHOLD
+    return SequenceMatcher(None, norm_a, norm_b).ratio() >= SIMILARITY_THRESHOLD
 
-def determine_primary_category(skill_name):
-    skill = normalize_skill(skill_name)
-    for category, terms in NON_TECH_CATEGORIES.items():
-        if any(term in skill for term in terms):
-            return category
-    for category, terms in MAIN_CATEGORIES.items():
-        if any(term in skill for term in terms):
-            return category
-    return 'OTHER_TECH' if is_technical(skill) else 'OTHER_NON_TECH'
 
-def create_initial_groups(skills):
-    groups = []
-    used_skills = set()
-    for skill in sorted(skills, key=len, reverse=True):
-        if skill in used_skills:
-            continue
-        matched_group = None
-        for group in groups:
-            if should_group_together(skill, group['representative']):
-                current_cat = determine_primary_category(skill)
-                group_cat = determine_primary_category(group['representative'])
-                if current_cat == group_cat or current_cat.startswith('OTHER'):
-                    matched_group = group
-                    break
-        if matched_group:
-            matched_group['originals'].append(skill)
-        else:
-            groups.append({
-                'category': determine_primary_category(skill),
-                'representative': skill,
-                'originals': [skill]
-            })
-        used_skills.add(skill)
+def determine_primary_category(skill_name: str) -> str:
+    """Assigns the most relevant category for a given skill."""
+    norm_skill = normalize_skill(skill_name)
+    for category, keywords in NON_TECH_CATEGORIES.items():
+        if any(kw in norm_skill for kw in keywords):
+            return f"NON_TECH_{category.upper()}"
+    for category, keywords in MAIN_CATEGORIES.items():
+        if any(kw in norm_skill for kw in keywords):
+            return category.upper()
+    return "OTHER_TECH" if is_technical(skill_name) else "OTHER_NON_TECH"
+
+
+def create_initial_groups(skills: List[str]) -> Dict[str, List[str]]:
+    """Creates initial skill groups based on semantic similarity."""
+    groups: Dict[str, List[str]] = {}
+    skills_sorted = sorted(skills, key=len, reverse=True)
+
+    for skill in tqdm(skills_sorted, desc="Grouping skills"):
+        matched = False
+        for group_name in groups:
+            if should_group_together(skill, group_name):
+                groups[group_name].append(skill)
+                matched = True
+                break
+        if not matched:
+            groups[skill] = [skill]
     return groups
 
-def consolidate_groups(groups):
-    consolidated = defaultdict(lambda: {'representative': None, 'originals': []})
-    for group in groups:
-        category = group['category']
-        if len(group['originals']) < MIN_GROUP_SIZE:
-            found = False
-            for main_cat in consolidated:
-                if should_group_together(group['representative'], consolidated[main_cat]['representative']):
-                    consolidated[main_cat]['originals'].extend(group['originals'])
-                    found = True
-                    break
-            if not found:
-                category = 'OTHER_' + category.split('_')[-1]
-        if consolidated[category]['representative'] is None or len(group['originals']) > len(consolidated[category]['originals']):
-            consolidated[category]['representative'] = group['representative']
-        consolidated[category]['originals'].extend(group['originals'])
-    final_groups = []
-    for category, data in consolidated.items():
-        unique_skills = list(set(data['originals']))
-        final_groups.append({
-            'category': category,
-            'representative': data['representative'],
-            'originals': sorted(unique_skills)
-        })
-    final_groups.sort(key=lambda x: (x['category'], -len(x['originals'])))
-    return final_groups
+
+def consolidate_groups(groups: Dict[str, List[str]]) -> Dict[str, List[str]]:
+    """Merges small groups and selects representative skill names."""
+    consolidated: Dict[str, List[str]] = {}
+
+    for group_name, skills in groups.items():
+        category = determine_primary_category(group_name)
+        if len(skills) < MIN_GROUP_SIZE:
+            if category not in consolidated:
+                consolidated[category] = []
+            consolidated[category].extend(skills)
+        else:
+            consolidated[group_name] = skills
+
+    # Deduplicate and sort
+    return {
+        k: sorted(list(set(v)))
+        for k, v in consolidated.items()
+    }
+
+
+def normalize_skills(input_file: str, output_file: str) -> None:
+    """Main function to process skills from input file and save results."""
+    logger.info(f"Extracting skills from {input_file}")
+    skills = extract_all_skill_names_from_jobs(input_file)
+
+    logger.info("Creating initial groups")
+    groups = create_initial_groups(skills)
+
+    logger.info("Consolidating groups")
+    final_groups = consolidate_groups(groups)
+
+    save_results(output_file, final_groups)
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(description="Skill Normalization Tool")
+    parser.add_argument("-i", "--input", default=DEFAULT_INPUT,
+                        help=f"Input JSON file (default: {DEFAULT_INPUT})")
+    parser.add_argument("-o", "--output", default=DEFAULT_OUTPUT,
+                        help=f"Output JSON file (default: {DEFAULT_OUTPUT})")
+
+    args = parser.parse_args()
+
+    normalize_skills(args.input, args.output)
