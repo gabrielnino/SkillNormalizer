@@ -16,7 +16,7 @@ DEFAULT_SUMMARY = "output_categories.txt"
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Categorías principales
+# Categorías técnicas ampliadas
 MAIN_CATEGORIES = {
     '.NET': ['dotnet', 'csharp', 'aspdotnet', 'vbnet', 'wpf', 'winforms', 'entityframework'],
     'CLOUD_AWS': ['aws', 'lambda', 's3', 'cloudfront', 'dynamodb'],
@@ -24,12 +24,16 @@ MAIN_CATEGORIES = {
     'CLOUD_GCP': ['gcp', 'google cloud'],
     'DATABASE_SQL': ['sql', 'oracle', 'mysql', 'postgres', 'mssql'],
     'DATABASE_NOSQL': ['mongodb', 'cassandra', 'cosmosdb'],
-    'FRONTEND': ['react', 'angular', 'vue', 'javascript', 'typescript', 'html', 'css'],
-    'BACKEND': ['node', 'python', 'java', 'spring', 'ruby', 'php'],
+    'FRONTEND': ['react', 'angular', 'vue', 'javascript', 'typescript', 'html', 'css', 'bootstrap'],
+    'BACKEND': ['node', 'python', 'java', 'spring', 'ruby', 'php', 'golang', 'go', 'c++', 'c', 'kotlin'],
     'DEVOPS': ['docker', 'kubernetes', 'terraform', 'ci/cd', 'jenkins', 'git'],
-    'TESTING': ['test', 'tdd', 'qa', 'junit', 'selenium'],
-    'NETWORKING': ['tcp/ip', 'dns', 'dhcp', 'network', 'wccp'],
-    'DATA_ENGINEERING': ['etl', 'data pipeline', 'data modeling', 'data governance']
+    'TESTING': ['test', 'tdd', 'qa', 'junit', 'selenium', 'mocha', 'jest'],
+    'NETWORKING': ['tcp/ip', 'dns', 'dhcp', 'network', 'firewall'],
+    'DATA_ENGINEERING': ['etl', 'data pipeline', 'data modeling', 'data governance', 'spark', 'hadoop'],
+    'SECURITY': ['oauth2', 'openid', 'iam', 'rbac', 'sso', 'encryption'],
+    'ML_AI': ['ai', 'ml', 'machine learning', 'deep learning', 'tensorflow', 'pytorch', 'scikit', 'vision'],
+    'LANGUAGES': ['c', 'c++', 'csharp', 'python', 'go', 'golang', 'java', 'kotlin', 'typescript', 'javascript'],
+    'DEV_TOOLS': ['vscode', 'visual studio', 'copilot', 'grafana', 'kibana', 'figma', 'notion']
 }
 
 NON_TECH_CATEGORIES = {
@@ -40,17 +44,8 @@ NON_TECH_CATEGORIES = {
 }
 
 CATEGORY_ALIASES = {
-    "aspnet": "dotnet",
-    "aspnetmvc": "dotnet",
-    "aspnetcore": "dotnet",
-    "dotnetcore": "dotnet",
-    "netcore": "dotnet",
-    "entityframework": "dotnet",
-    "c#": "dotnet",
-    "csharp": "dotnet",
-    "ts": "typescript",
-    "js": "javascript",
-    "py": "python"
+    "aspnet": "dotnet", "dotnetcore": "dotnet", "netcore": "dotnet",
+    "c#": "csharp", "ts": "typescript", "js": "javascript", "py": "python"
 }
 
 SOFT_KEYWORDS = [
@@ -115,12 +110,12 @@ def should_group_together(a: str, b: str) -> bool:
 
 def determine_primary_category(skill_name: str) -> str:
     norm_skill = normalize_skill(skill_name)
-    for category, keywords in NON_TECH_CATEGORIES.items():
-        if any(kw in norm_skill for kw in keywords):
-            return f"NON_TECH_{category.upper()}"
     for category, keywords in MAIN_CATEGORIES.items():
         if any(kw in norm_skill for kw in keywords):
             return category.upper()
+    for category, keywords in NON_TECH_CATEGORIES.items():
+        if any(kw in norm_skill for kw in keywords):
+            return f"NON_TECH_{category.upper()}"
     return "OTHER_TECH" if is_technical(skill_name) else "OTHER_NON_TECH"
 
 
@@ -164,7 +159,7 @@ def filter_and_reclassify_groups(groups: Dict[str, List[str]]) -> Dict[str, List
             if any(kw in skill_lower for kw in SOFT_KEYWORDS):
                 target = "SOFT_SKILLS"
             else:
-                target = category
+                target = determine_primary_category(skill)
             if target not in final_groups:
                 final_groups[target] = []
             final_groups[target].append(skill)
