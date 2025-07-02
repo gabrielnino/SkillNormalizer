@@ -6,6 +6,12 @@ from difflib import SequenceMatcher
 from typing import Dict, List
 from tqdm import tqdm
 
+# Ensure stdout uses UTF-8 (especially helpful on Windows)
+try:
+    sys.stdout.reconfigure(encoding='utf-8')
+except Exception:
+    pass
+
 # Configuration
 MIN_GROUP_SIZE = 3
 SIMILARITY_THRESHOLD = 0.8
@@ -13,7 +19,15 @@ DEFAULT_INPUT = "processed_parse_jobs.json"
 DEFAULT_OUTPUT = "normalized_skills.json"
 DEFAULT_SUMMARY = "output_categories.txt"
 
-logging.basicConfig(level=logging.INFO)
+# Set up logging configuration
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler('skill_normalization.log'),
+        logging.StreamHandler()
+    ]
+)
 logger = logging.getLogger(__name__)
 
 # Main technical categories
@@ -64,20 +78,31 @@ DISCARD_PHRASES = [
 
 
 def extract_all_skill_names_from_jobs(file_path: str) -> List[str]:
-    with open(file_path, 'r') as f:
-        data = json.load(f)
-    skills = set()
-    for job in data:
-        for key in ['KeySkillsRequired', 'EssentialQualifications',
-                    'EssentialTechnicalSkillQualifications', 'OtherTechnicalSkillQualifications']:
-            for skill in job.get(key, []):
-                name = skill.get('Name')
-                if name:
-                    skills.add(name.strip())
-    return list(skills)
+    try:
+        logger.info(f"Starting to extract skills from {file_path}")
+        with open(file_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+
+        skills = set()
+        for job in data:
+            for key in ['KeySkillsRequired', 'EssentialQualifications',
+                        'EssentialTechnicalSkillQualifications', 'OtherTechnicalSkillQualifications']:
+                for skill in job.get(key, []):
+                    name = skill.get('Name')
+                    if name:
+                        skills.add(name.strip())
+
+        logger.info(f"Extracted {len(skills)} unique skills")
+        return list(skills)
+
+    except Exception as e:
+        logger.error(f"Error extracting skills: {e}", exc_info=True)
+        return []
 
 
 def normalize_skill(skill_name: str) -> str:
+    if not skill_name:
+        return ""
     skill = skill_name.lower().strip()
     skill = skill.replace(".net", "dotnet").replace("c#", "csharp")
     skill = re.sub(r"[^a-z0-9]+", "", skill)
@@ -86,8 +111,6 @@ def normalize_skill(skill_name: str) -> str:
 
 def should_group_together(a: str, b: str) -> bool:
     norm_a, norm_b = normalize_skill(a), normalize_skill(b)
-    if not norm_a or not norm_b:
-        return False
     if norm_a in norm_b or norm_b in norm_a:
         return True
     if norm_a[:4] == norm_b[:4]:
@@ -99,41 +122,38 @@ def determine_primary_category(skill_name: str) -> str:
     norm_skill = normalize_skill(skill_name)
     raw_skill = skill_name.lower()
 
-    # Prioritize precise technical categories first
-    for category in ['SECURITY', 'ML_AI', 'DEVOPS', 'DATA_ENGINEERING', 'FRONTEND', '.NET',
-                     'CLOUD_AWS', 'CLOUD_AZURE', 'CLOUD_GCP', 'DATABASE_SQL', 'DATABASE_NOSQL']:
-        if any(kw in norm_skill for kw in MAIN_CATEGORIES[category]):
-            return category
+    for category in MAIN_CATEGORIES:
+        for kw in MAIN_CATEGORIES[category]:
+            if kw in norm_skill:
+                return category
 
-    # Non-technical categories
     for category, keywords in NON_TECH_CATEGORIES.items():
-        if any(kw in raw_skill for kw in keywords):
-            return f"NON_TECH_{category.upper()}"
+        for kw in keywords:
+            if kw in raw_skill:
+                return f"NON_TECH_{category.upper()}"
 
-    # Soft skills
-    if any(kw in raw_skill for kw in SOFT_KEYWORDS):
-        return "SOFT_SKILLS"
+    for kw in SOFT_KEYWORDS:
+        if kw in raw_skill:
+            return "SOFT_SKILLS"
 
-    # Controlled fallback to BACKEND
-    if any(kw in norm_skill for kw in MAIN_CATEGORIES['BACKEND']):
-        # Avoid misclassification if also DevOps, ML, Security, or DataEng
-        if not any(kw in norm_skill for kw in MAIN_CATEGORIES['DEVOPS'] +
-                                          MAIN_CATEGORIES['ML_AI'] +
-                                          MAIN_CATEGORIES['SECURITY'] +
-                                          MAIN_CATEGORIES['DATA_ENGINEERING']):
-            return 'BACKEND'
+    for kw in MAIN_CATEGORIES['BACKEND']:
+        if kw in norm_skill:
+            for other_cat in ['DEVOPS', 'ML_AI', 'SECURITY', 'DATA_ENGINEERING']:
+                for other_kw in MAIN_CATEGORIES[other_cat]:
+                    if other_kw in norm_skill:
+                        return "GENERAL_TECH"
+            return "BACKEND"
 
     return "GENERAL_TECH"
 
 
 def create_initial_groups(skills: List[str]) -> Dict[str, List[str]]:
     groups = {}
-    skills_sorted = sorted(skills, key=len, reverse=True)
-    for skill in tqdm(skills_sorted, desc="Grouping skills"):
+    for skill in tqdm(skills, desc="Grouping skills"):
         matched = False
-        for group_name in groups:
-            if should_group_together(skill, group_name):
-                groups[group_name].append(skill)
+        for group in groups:
+            if should_group_together(skill, group):
+                groups[group].append(skill)
                 matched = True
                 break
         if not matched:
@@ -146,9 +166,7 @@ def consolidate_groups(groups: Dict[str, List[str]]) -> Dict[str, List[str]]:
     for group_name, skills in groups.items():
         category = determine_primary_category(group_name)
         if len(skills) < MIN_GROUP_SIZE:
-            if category not in consolidated:
-                consolidated[category] = []
-            consolidated[category].extend(skills)
+            consolidated.setdefault(category, []).extend(skills)
         else:
             consolidated[group_name] = skills
     return {k: sorted(set(v)) for k, v in consolidated.items()}
@@ -158,56 +176,38 @@ def filter_and_reclassify_groups(groups: Dict[str, List[str]]) -> Dict[str, List
     final_groups = {}
     for category, skills in groups.items():
         for skill in skills:
-            lower = skill.lower()
-            if any(p in lower for p in DISCARD_PHRASES):
+            if any(p in skill.lower() for p in DISCARD_PHRASES):
                 continue
-            target = determine_primary_category(skill)
-            final_groups.setdefault(target, []).append(skill)
-    return {cat: sorted(set(vals)) for cat, vals in final_groups.items()}
+            new_cat = determine_primary_category(skill)
+            final_groups.setdefault(new_cat, []).append(skill)
+    return {k: sorted(set(v)) for k, v in final_groups.items()}
 
 
 def save_results(output_file: str, results: Dict[str, List[str]]) -> None:
-    with open(output_file, 'w') as f:
-        json.dump(results, f, indent=2)
-    logger.info(f"Saved JSON results to {output_file}")
+    with open(output_file, 'w', encoding='utf-8') as f:
+        json.dump(results, f, indent=2, ensure_ascii=False)
 
 
 def save_categories_summary(groups: Dict[str, List[str]], output_path: str) -> None:
-    with open(output_path, 'w', encoding='utf-8') as f:
+    with open(output_path, 'w', encoding='utf-8', errors='replace') as f:
         for category, skills in sorted(groups.items()):
             f.write(f"[{category}] - {len(skills)} skills\n")
             for skill in sorted(skills):
                 f.write(f"  - {skill}\n")
             f.write("\n")
-    logger.info(f"Saved summary to {output_path}")
 
 
-def normalize_skills(input_file: str, output_file: str, summary_file: str) -> None:
-    logger.info(f"Processing file: {input_file}")
+def main(input_file=DEFAULT_INPUT, output_file=DEFAULT_OUTPUT, summary_file=DEFAULT_SUMMARY):
+    logger.info("=== Script started ===")
+    logger.info(f"Command line arguments: input={input_file}, output={output_file}, summary={summary_file}")
     skills = extract_all_skill_names_from_jobs(input_file)
-
-    logger.info("Grouping skills...")
-    groups = create_initial_groups(skills)
-
-    logger.info("Consolidating groups...")
-    consolidated = consolidate_groups(groups)
-
-    logger.info("Filtering and reclassifying...")
-    refined = filter_and_reclassify_groups(consolidated)
-
-    save_results(output_file, refined)
-    save_categories_summary(refined, summary_file)
-
-    print(f"\n✅ Total categories: {len(refined)}")
+    initial_groups = create_initial_groups(skills)
+    consolidated = consolidate_groups(initial_groups)
+    final_groups = filter_and_reclassify_groups(consolidated)
+    save_results(output_file, final_groups)
+    save_categories_summary(final_groups, summary_file)
+    logger.info("=== Script completed successfully ===")
 
 
 if __name__ == "__main__":
-    import argparse
-
-    parser = argparse.ArgumentParser(description="Skill Normalization and Categorization Tool")
-    parser.add_argument("-i", "--input", default=DEFAULT_INPUT)
-    parser.add_argument("-o", "--output", default=DEFAULT_OUTPUT)
-    parser.add_argument("-s", "--summary", default=DEFAULT_SUMMARY)
-
-    args = parser.parse_args()
-    normalize_skills(args.input, args.output, args.summary)
+    main()

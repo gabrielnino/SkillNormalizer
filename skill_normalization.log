@@ -1,0 +1,28 @@
+2025-07-02 16:43:52,963 - __main__ - INFO - === Script started ===
+2025-07-02 16:43:52,976 - __main__ - INFO - Command line arguments: input=processed_parse_jobs.json, output=out.json, summary=output_categories.txt
+2025-07-02 16:43:52,976 - __main__ - INFO - Starting skill normalization process with input: processed_parse_jobs.json
+2025-07-02 16:43:52,976 - __main__ - INFO - === Starting skill extraction ===
+2025-07-02 16:43:52,976 - __main__ - INFO - Starting to extract skills from processed_parse_jobs.json
+2025-07-02 16:43:52,977 - __main__ - INFO - Found 218 jobs to process
+2025-07-02 16:43:52,977 - __main__ - INFO - Finished extracting skills. Total unique skills found: 2278
+2025-07-02 16:43:52,977 - __main__ - INFO - Extracted 2278 unique skills
+2025-07-02 16:43:52,977 - __main__ - INFO - === Starting initial grouping ===
+2025-07-02 16:43:52,977 - __main__ - INFO - Creating initial groups from 2278 skills
+2025-07-02 16:44:07,490 - __main__ - INFO - Created 411 initial groups
+2025-07-02 16:44:07,490 - __main__ - INFO - === Starting group consolidation ===
+2025-07-02 16:44:07,490 - __main__ - INFO - Consolidating 411 initial groups
+2025-07-02 16:44:07,495 - __main__ - INFO - Consolidated 270 small groups into categories
+2025-07-02 16:44:07,497 - __main__ - INFO - === Starting filtering and reclassification ===
+2025-07-02 16:44:07,497 - __main__ - INFO - Filtering and reclassifying 156 groups
+2025-07-02 16:44:07,521 - __main__ - INFO - Filtering complete. Discarded 342 skills. Final categories: 19
+2025-07-02 16:44:07,521 - __main__ - INFO - === Saving results ===
+2025-07-02 16:44:07,521 - __main__ - INFO - Saving results to out.json
+2025-07-02 16:44:07,521 - __main__ - INFO - Successfully saved JSON results to out.json
+2025-07-02 16:44:07,521 - __main__ - INFO - Saving summary to output_categories.txt
+2025-07-02 16:44:07,521 - __main__ - INFO - Successfully saved summary to output_categories.txt
+2025-07-02 16:44:07,536 - __main__ - INFO - === Script completed successfully ===
+2025-07-02 16:47:49,175 - __main__ - INFO - === Script started ===
+2025-07-02 16:47:49,175 - __main__ - INFO - Command line arguments: input=processed_parse_jobs.json, output=normalized_skills.json, summary=output_categories.txt
+2025-07-02 16:47:49,175 - __main__ - INFO - Starting to extract skills from processed_parse_jobs.json
+2025-07-02 16:47:49,180 - __main__ - INFO - Extracted 2278 unique skills
+2025-07-02 16:47:59,404 - __main__ - INFO - === Script completed successfully ===
