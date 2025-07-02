@@ -6,7 +6,7 @@ from difflib import SequenceMatcher
 from typing import Dict, List
 from tqdm import tqdm
 
-# Configuración
+# Configuration
 MIN_GROUP_SIZE = 3
 SIMILARITY_THRESHOLD = 0.8
 DEFAULT_INPUT = "processed_parse_jobs.json"
@@ -16,7 +16,7 @@ DEFAULT_SUMMARY = "output_categories.txt"
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Categorías técnicas ampliadas
+# Main technical categories
 MAIN_CATEGORIES = {
     '.NET': ['dotnet', 'csharp', 'aspdotnet', 'vbnet', 'wpf', 'winforms', 'entityframework'],
     'CLOUD_AWS': ['aws', 'lambda', 's3', 'cloudfront', 'dynamodb'],
@@ -36,6 +36,7 @@ MAIN_CATEGORIES = {
     'DEV_TOOLS': ['vscode', 'visual studio', 'copilot', 'grafana', 'kibana', 'figma', 'notion']
 }
 
+# Non-technical categories
 NON_TECH_CATEGORIES = {
     'BUSINESS': ['sales', 'negotiation', 'client', 'customer', 'cold calling'],
     'OPERATIONS': ['warehouse', 'forklift', 'logistics', 'kitchen', 'inventory'],
@@ -98,22 +99,31 @@ def determine_primary_category(skill_name: str) -> str:
     norm_skill = normalize_skill(skill_name)
     raw_skill = skill_name.lower()
 
+    # Prioritize precise technical categories first
     for category in ['SECURITY', 'ML_AI', 'DEVOPS', 'DATA_ENGINEERING', 'FRONTEND', '.NET',
                      'CLOUD_AWS', 'CLOUD_AZURE', 'CLOUD_GCP', 'DATABASE_SQL', 'DATABASE_NOSQL']:
         if any(kw in norm_skill for kw in MAIN_CATEGORIES[category]):
             return category
 
+    # Non-technical categories
     for category, keywords in NON_TECH_CATEGORIES.items():
         if any(kw in raw_skill for kw in keywords):
             return f"NON_TECH_{category.upper()}"
 
+    # Soft skills
     if any(kw in raw_skill for kw in SOFT_KEYWORDS):
         return "SOFT_SKILLS"
 
+    # Controlled fallback to BACKEND
     if any(kw in norm_skill for kw in MAIN_CATEGORIES['BACKEND']):
-        return 'BACKEND'
+        # Avoid misclassification if also DevOps, ML, Security, or DataEng
+        if not any(kw in norm_skill for kw in MAIN_CATEGORIES['DEVOPS'] +
+                                          MAIN_CATEGORIES['ML_AI'] +
+                                          MAIN_CATEGORIES['SECURITY'] +
+                                          MAIN_CATEGORIES['DATA_ENGINEERING']):
+            return 'BACKEND'
 
-    return "OTHER_NON_TECH"
+    return "GENERAL_TECH"
 
 
 def create_initial_groups(skills: List[str]) -> Dict[str, List[str]]:
