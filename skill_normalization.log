@@ -70,3 +70,10 @@
 2025-07-02 18:12:20,743 - __main__ - INFO - Consolidated into 114 groups
 2025-07-02 18:12:21,279 - __main__ - INFO - Final categories: 61
 2025-07-02 18:12:21,282 - __main__ - INFO - === Script completed successfully ===
+2025-07-02 18:56:17,225 - __main__ - INFO - === Script started ===
+2025-07-02 18:56:17,225 - __main__ - INFO - Command line arguments: input=processed_parse_jobs.json, output=normalized_skills.json, summary=output_categories.txt
+2025-07-02 18:56:17,252 - __main__ - INFO - Extracted 951 unique skills
+2025-07-02 18:56:39,833 - __main__ - INFO - Created 647 initial groups
+2025-07-02 18:56:44,201 - __main__ - INFO - Consolidated into 122 groups
+2025-07-02 18:56:50,134 - __main__ - INFO - Final categories: 67
+2025-07-02 18:56:50,134 - __main__ - INFO - === Script completed successfully ===
