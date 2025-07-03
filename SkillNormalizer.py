@@ -43,9 +43,9 @@ CATEGORY_HIERARCHY = {
             'PHP': ['php', 'laravel', 'symfony'],
             'C_CPP': ['c', 'c\+\+', 'cplusplus', 'cpp'],
             'MOBILE': ['android', 'ios', 'flutter', 'react native', 'swift', 'kotlin'],
-            'OO': ['object-oriented', 'oop', 'object oriented programming',
-                   'object-oriented programming', 'object-oriented design',
-                   'solid principles', 'design patterns']
+            'CONCEPTS': ['algorithms', 'data structures', 'design patterns', 'oop',
+                         'object-oriented', 'solid principles', 'object oriented programming',
+                         'object-oriented programming', 'object-oriented design']
         },
         'FRONTEND': {
             'FRAMEWORKS': ['react', 'angular', 'vue', 'svelte', 'ember'],
@@ -70,19 +70,20 @@ CATEGORY_HIERARCHY = {
             'AWS': ['aws', 'lambda', 's3', 'cloudfront', 'dynamodb', 'amazon web services', 'ec2', 'rds'],
             'AZURE': ['azure', 'functions', 'entra', 'sql database', 'microsoft azure', 'azure ad'],
             'GCP': ['gcp', 'google cloud', 'google cloud platform', 'bigtable', 'cloud functions'],
-            'CLOUD_GENERAL': ['kubernetes', 'docker', 'serverless', 'paas', 'saas', 'iaas'],
+            'CLOUD_GENERAL': ['kubernetes', 'docker', 'serverless', 'paas', 'saas', 'iaas', 'cloud computing'],
         },
         'DEVOPS': {
-            'CI_CD': ['ci/cd', 'jenkins', 'github actions', 'gitlab ci', 'circleci'],
+            'CI_CD': ['ci/cd', 'jenkins', 'github actions', 'gitlab ci', 'circleci', 'continuous integration'],
             'INFRA_AS_CODE': ['terraform', 'pulumi', 'cloudformation', 'ansible'],
             'MONITORING': ['grafana', 'prometheus', 'datadog', 'new relic', 'splunk'],
             'VERSION_CONTROL': ['git', 'svn', 'mercurial', 'perforce'],
+            'DEVOPS_GENERAL': ['git', 'svn', 'mercurial', 'perforce', 'devops', 'build pipelines', 'infrastructure as code'],
         },
         'TESTING': {
             'UNIT_TESTING': ['junit', 'nunit', 'pytest', 'mocha', 'jest'],
             'E2E_TESTING': ['selenium', 'cypress', 'playwright', 'testcafe'],
             'PERFORMANCE': ['jmeter', 'gatling', 'locust', 'k6'],
-            'TEST_AUTOMATION': ['test automation', 'bdd', 'tdd', 'qa automation'],
+            'TEST_AUTOMATION': ['test automation', 'bdd', 'tdd', 'qa automation', 'automated testing'],
         },
         'ML_AI': {
             'MACHINE_LEARNING': ['machine learning', 'ml', 'tensorflow', 'pytorch', 'scikit-learn'],
@@ -107,28 +108,30 @@ CATEGORY_HIERARCHY = {
             'FIRMWARE': ['firmware', 'rtos', 'bare metal'],
             'DRIVERS': ['device drivers', 'kernel development'],
         },
+        'SYSTEM': {
+            'DESIGN': ['system design', 'distributed systems', 'microservices',
+                       'scalable architectures', 'event-driven architecture'],
+            'TOOLS': ['powershell', 'visual studio', 'linux', 'cli', 'cmake'],
+            'CONCEPTS': ['operating system', 'networking', 'file systems', 'multi-threaded']
+        }
     },
     'NON_TECHNICAL': {
         'BUSINESS': ['sales', 'negotiation', 'client', 'customer', 'business development', 'account management'],
         'PROJECT_MGMT': ['project management', 'agile', 'scrum', 'kanban', 'waterfall'],
-        'ANALYTICS': ['business intelligence', 'power bi', 'tableau', 'data visualization', 'analytics'],
-        'OPERATIONS': ['logistics', 'supply chain', 'inventory', 'warehouse', 'forklift'],
-        'HEALTHCARE': ['patient care', 'nursing', 'medical', 'radiology', 'pharmacy'],
-        'EDUCATION': ['teaching', 'tutoring', 'curriculum', 'instructional design'],
-        'LANGUAGES': ['english', 'french', 'spanish', 'german', 'translation'],
-        'CREATIVE': ['graphic design', 'ui/ux', 'photoshop', 'illustrator', 'figma'],
-    },
-    'SOFT_SKILLS': {
-        'COMMUNICATION': ['communication', 'presentation', 'public speaking', 'writing'],
-        'LEADERSHIP': ['leadership', 'mentoring', 'coaching', 'team building'],
-        'COLLABORATION': ['teamwork', 'collaboration', 'interpersonal'],
-        'PROBLEM_SOLVING': ['problem solving', 'critical thinking', 'analytical'],
-        'ADAPTABILITY': ['adaptability', 'flexibility', 'learning agility'],
+        'ANALYTICS': ['business intelligence', 'power bi', 'tableau', 'data visualization'],
+        'OPERATIONS': ['logistics', 'supply chain', 'inventory', 'warehouse'],
+        'EDUCATION': {
+            'CERTIFICATION': ['degree', 'certification', 'bachelor', 'master', 'education'],
+            'TEACHING': ['teaching', 'tutoring', 'mentoring', 'instruction']
+        },
+        'COMMUNICATION': ['communication', 'presentation', 'writing', 'documentation'],
+        'LEADERSHIP': ['leadership', 'team building', 'mentoring', 'coaching'],
+        'PROBLEM_SOLVING': ['problem solving', 'critical thinking', 'analytical']
     }
 }
 
-# Flatten categories
 
+# Flatten categories
 def flatten_categories(hierarchy, prefix=""):
     flat = {}
     for cat, val in hierarchy.items():
@@ -138,16 +141,20 @@ def flatten_categories(hierarchy, prefix=""):
             flat[f"{prefix}{cat}"] = val
     return flat
 
+
 MAIN_CATEGORIES = flatten_categories(CATEGORY_HIERARCHY['TECHNICAL'])
-ALL_CATEGORIES = {**MAIN_CATEGORIES}
+NON_TECH_CATEGORIES = flatten_categories(CATEGORY_HIERARCHY['NON_TECHNICAL'])
+ALL_CATEGORIES = {**MAIN_CATEGORIES, **NON_TECH_CATEGORIES}
 
 CATEGORY_ALIASES = {
     "aspnet": "dotnet", "dotnetcore": "dotnet", "netcore": "dotnet",
-    "c#": "csharp", "asp.net": "aspdotnet",
+    "c#": "csharp", "asp.net": "aspdotnet", "oop": "object oriented programming",
+    "devops": "ci/cd", "cloud": "cloud computing", "db": "database"
 }
 
 EXPERIENCE_PATTERNS = [r"\d+\+?\s*years?"]
-DISCARD_PHRASES = ["years of experience", "experience with"]
+DISCARD_PHRASES = ["years of experience", "experience with", "knowledge of", "understanding of"]
+
 
 def clean_skill_name(skill_name):
     if not skill_name:
@@ -159,12 +166,14 @@ def clean_skill_name(skill_name):
     skill = re.sub(r'[.,;:]$', '', skill)
     return skill.strip()
 
+
 def should_discard(skill_name):
     if len(skill_name.strip()) < 2 or len(skill_name.split()) > 6:
         return True
     if any(re.search(p, skill_name, re.IGNORECASE) for p in EXPERIENCE_PATTERNS):
         return True
     return any(p in skill_name.lower() for p in DISCARD_PHRASES)
+
 
 def normalize_skill(skill_name):
     if not skill_name:
@@ -177,6 +186,7 @@ def normalize_skill(skill_name):
         skill = re.sub(rf'\b{re.escape(alias)}\b', std, skill)
     return re.sub(r'\s+', ' ', skill).strip()
 
+
 def should_group_together(a, b):
     na, nb = normalize_skill(a), normalize_skill(b)
     if na == nb or re.search(rf'\b{re.escape(na)}\b', nb) or re.search(rf'\b{re.escape(nb)}\b', na):
@@ -185,12 +195,22 @@ def should_group_together(a, b):
         return True
     return SequenceMatcher(None, na, nb).ratio() >= SIMILARITY_THRESHOLD
 
+
 def determine_primary_category(skill_name):
     norm_skill = normalize_skill(skill_name)
+
+    # First check technical categories
     for category, keywords in MAIN_CATEGORIES.items():
         if any(re.search(rf'\b{re.escape(kw)}\b', norm_skill) for kw in keywords):
             return category
+
+    # Then check non-technical categories
+    for category, keywords in NON_TECH_CATEGORIES.items():
+        if any(re.search(rf'\b{re.escape(kw)}\b', norm_skill) for kw in keywords):
+            return category
+
     return "GENERAL_TECH"
+
 
 def extract_all_skill_names_from_jobs(file_path: str) -> List[str]:
     try:
@@ -212,6 +232,7 @@ def extract_all_skill_names_from_jobs(file_path: str) -> List[str]:
         logger.error(f"Error extracting skills: {e}", exc_info=True)
         return []
 
+
 def create_initial_groups(skills: List[str]) -> Dict[str, List[str]]:
     groups = {}
     for skill in tqdm(skills, desc="Grouping skills"):
@@ -225,6 +246,7 @@ def create_initial_groups(skills: List[str]) -> Dict[str, List[str]]:
             groups[skill] = [skill]
     return groups
 
+
 def consolidate_groups(groups: Dict[str, List[str]]) -> Dict[str, List[str]]:
     consolidated = {}
     for group_name, skills in groups.items():
@@ -234,6 +256,7 @@ def consolidate_groups(groups: Dict[str, List[str]]) -> Dict[str, List[str]]:
         else:
             consolidated[group_name] = skills
     return {k: sorted(set(v)) for k, v in consolidated.items()}
+
 
 def filter_and_reclassify_groups(groups: Dict[str, List[str]]) -> Dict[str, List[str]]:
     final_groups = {}
@@ -245,9 +268,11 @@ def filter_and_reclassify_groups(groups: Dict[str, List[str]]) -> Dict[str, List
             final_groups.setdefault(new_cat, []).append(skill)
     return {k: sorted(set(v)) for k, v in final_groups.items()}
 
+
 def save_results(output_file: str, results: Dict[str, List[str]]):
     with open(output_file, 'w', encoding='utf-8') as f:
         json.dump(results, f, indent=2, ensure_ascii=False)
+
 
 def save_categories_summary(groups: Dict[str, List[str]], output_path: str):
     with open(output_path, 'w', encoding='utf-8') as f:
@@ -256,6 +281,7 @@ def save_categories_summary(groups: Dict[str, List[str]], output_path: str):
             for skill in sorted(skills):
                 f.write(f"  - {skill}\n")
             f.write("\n")
+
 
 def main(input_file=DEFAULT_INPUT, output_file=DEFAULT_OUTPUT, summary_file=DEFAULT_SUMMARY):
     logger.info("=== Script started ===")
@@ -275,6 +301,7 @@ def main(input_file=DEFAULT_INPUT, output_file=DEFAULT_OUTPUT, summary_file=DEFA
     save_categories_summary(final_groups, summary_file)
 
     logger.info("=== Script completed successfully ===")
+
 
 if __name__ == "__main__":
     main()
