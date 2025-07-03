@@ -741,6 +741,57 @@ def save_categories_summary(groups: Dict[str, List[str]], output_path: str):
                 f.write(f"  - {skill}\n")
             f.write("\n")
 
+def save_augmented_jobs_with_skills(input_file: str, final_groups: Dict[str, List[str]], output_file: str):
+    try:
+        with open(input_file, 'r', encoding='utf-8') as f:
+            jobs = json.load(f)
+
+        # Diccionario inverso: skill → categoría
+        skill_to_category = {}
+        for category, skills in final_groups.items():
+            for skill in skills:
+                skill_to_category[skill] = category
+
+        for job in jobs:
+            category_map = {}
+
+            for skill in job.get('KeySkillsRequired', []):
+                name = skill.get('Name')
+                relevance = skill.get('RelevancePercentage', 0)
+
+                if name:
+                    cleaned = clean_skill_name(name)
+                    if cleaned and not should_discard(cleaned):
+                        category = skill_to_category.get(cleaned, "UNCATEGORIZED")
+                        if category not in category_map:
+                            category_map[category] = {
+                                "name": name,
+                                "category": category,
+                                "relevance": relevance
+                            }
+                        else:
+                            category_map[category]["relevance"] += relevance
+
+            job['Skills'] = sorted(
+                [
+                    {"name": value["name"], "category": value["category"], "relevance": round(value["relevance"], 2)}
+                    for value in category_map.values()
+                ],
+                key=lambda x: x["relevance"],
+                reverse=True
+            )
+
+        # Guardar archivo
+        output_path = input_file.replace(".json", "_with_skills.json")
+        with open(output_path, 'w', encoding='utf-8') as f:
+            json.dump(jobs, f, indent=2, ensure_ascii=False)
+
+        logger.info(f"Augmented job file saved to {output_path}")
+    except Exception as e:
+        logger.error(f"Error saving augmented job file: {e}", exc_info=True)
+
+
+
 
 def main(input_file=DEFAULT_INPUT, output_file=DEFAULT_OUTPUT, summary_file=DEFAULT_SUMMARY):
     logger.info("=== Script started ===")
@@ -758,6 +809,7 @@ def main(input_file=DEFAULT_INPUT, output_file=DEFAULT_OUTPUT, summary_file=DEFA
 
     save_results(output_file, final_groups)
     save_categories_summary(final_groups, summary_file)
+    save_augmented_jobs_with_skills(input_file, final_groups, output_file)
 
     logger.info("=== Script completed successfully ===")
 
