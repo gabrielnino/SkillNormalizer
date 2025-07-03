@@ -113,6 +113,16 @@ CATEGORY_HIERARCHY = {
                        'scalable architectures', 'event-driven architecture'],
             'TOOLS': ['powershell', 'visual studio', 'linux', 'cli', 'cmake'],
             'CONCEPTS': ['operating system', 'networking', 'file systems', 'multi-threaded']
+        },
+        'GENERAL_TECH': {
+            'SOFTWARE_DEVELOPMENT': ['software development', 'coding', 'programming', 'debugging', 'refactoring'],
+            'WEB_DEVELOPMENT': ['web development', 'web applications', 'frontend', 'backend', 'full-stack'],
+            'DATABASES': ['database', 'sql', 'nosql', 'query optimization', 'data modeling'],
+            'CLOUD_DEVOPS': ['cloud computing', 'devops', 'ci/cd', 'infrastructure as code'],
+            'TESTING_QA': ['testing', 'qa', 'test automation', 'unit testing', 'integration testing'],
+            'TOOLS_PLATFORMS': ['git', 'docker', 'kubernetes', 'visual studio', 'ide'],
+            'SOFT_SKILLS': ['problem solving', 'communication', 'teamwork', 'collaboration', 'mentoring'],
+            'INDUSTRY_SPECIFIC': ['healthcare', 'finance', 'e-commerce', 'gaming', 'embedded systems']
         }
     },
     'NON_TECHNICAL': {
@@ -208,6 +218,12 @@ def determine_primary_category(skill_name):
     for category, keywords in NON_TECH_CATEGORIES.items():
         if any(re.search(rf'\b{re.escape(kw)}\b', norm_skill) for kw in keywords):
             return category
+
+    # Fallback to GENERAL_TECH subcategories
+    general_tech_cats = CATEGORY_HIERARCHY['TECHNICAL']['GENERAL_TECH']
+    for subcat, keywords in general_tech_cats.items():
+        if any(re.search(rf'\b{re.escape(kw)}\b', norm_skill) for kw in keywords):
+            return f"GENERAL_TECH_{subcat}"
 
     return "GENERAL_TECH"
 
