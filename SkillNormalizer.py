@@ -43,6 +43,9 @@ CATEGORY_HIERARCHY = {
             'PHP': ['php', 'laravel', 'symfony'],
             'C_CPP': ['c', 'c\+\+', 'cplusplus', 'cpp'],
             'MOBILE': ['android', 'ios', 'flutter', 'react native', 'swift', 'kotlin'],
+            'OO': ['object-oriented', 'oop', 'object oriented programming',
+                   'object-oriented programming', 'object-oriented design',
+                   'solid principles', 'design patterns']
         },
         'FRONTEND': {
             'FRAMEWORKS': ['react', 'angular', 'vue', 'svelte', 'ember'],
