@@ -1,33 +1,230 @@
 import json
-import logging
-import re
-from difflib import SequenceMatcher
-from sys import stdout
-from typing import Dict, List
-from tqdm import tqdm
+import tkinter as tk
+from tkinter import ttk, messagebox, filedialog
 
-try:
-    stdout.reconfigure(encoding='utf-8')
-except Exception:
-    pass
 
-# Configuration
-MIN_GROUP_SIZE = 3
-SIMILARITY_THRESHOLD = 0.8
-DEFAULT_INPUT = "processed_parse_jobs.json"
-DEFAULT_OUTPUT = "normalized_skills.json"
-DEFAULT_SUMMARY = "output_categories.txt"
+class CategoryEditor:
+    def __init__(self, root, hierarchy):
+        self.root = root
+        self.root.title("Category Hierarchy Editor")
+        self.hierarchy = hierarchy
+        self.tree = None
+        self.selected_node = None
+        self.setup_ui()
+        self.load_hierarchy()
 
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('skill_normalization.log'),
-        logging.StreamHandler()
-    ]
-)
-logger = logging.getLogger(__name__)
+    def setup_ui(self):
+        # Create main frames
+        self.tree_frame = ttk.Frame(self.root)
+        self.tree_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5, pady=5)
 
+        self.control_frame = ttk.Frame(self.root)
+        self.control_frame.pack(side=tk.RIGHT, fill=tk.Y, padx=5, pady=5)
+
+        # Treeview with scrollbar
+        self.tree_scroll = ttk.Scrollbar(self.tree_frame)
+        self.tree_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+
+        self.tree = ttk.Treeview(self.tree_frame, yscrollcommand=self.tree_scroll.set)
+        self.tree.pack(fill=tk.BOTH, expand=True)
+        self.tree_scroll.config(command=self.tree.yview)
+
+        self.tree.bind("<<TreeviewSelect>>", self.on_tree_select)
+
+        # Control buttons
+        ttk.Button(self.control_frame, text="Add Category", command=self.add_category).pack(fill=tk.X, pady=2)
+        ttk.Button(self.control_frame, text="Add Term", command=self.add_term).pack(fill=tk.X, pady=2)
+        ttk.Button(self.control_frame, text="Edit", command=self.edit_item).pack(fill=tk.X, pady=2)
+        ttk.Button(self.control_frame, text="Remove", command=self.remove_item).pack(fill=tk.X, pady=2)
+        ttk.Button(self.control_frame, text="Move Up", command=self.move_up).pack(fill=tk.X, pady=2)
+        ttk.Button(self.control_frame, text="Move Down", command=self.move_down).pack(fill=tk.X, pady=2)
+        ttk.Button(self.control_frame, text="Save", command=self.save_hierarchy).pack(fill=tk.X, pady=2)
+        ttk.Button(self.control_frame, text="Expand All", command=self.expand_all).pack(fill=tk.X, pady=2)
+        ttk.Button(self.control_frame, text="Collapse All", command=self.collapse_all).pack(fill=tk.X, pady=2)
+
+        # Status bar
+        self.status = ttk.Label(self.control_frame, text="Ready")
+        self.status.pack(fill=tk.X, pady=5)
+
+    def load_hierarchy(self, parent="", hierarchy=None):
+        if hierarchy is None:
+            hierarchy = self.hierarchy
+
+        for key, value in hierarchy.items():
+            if isinstance(value, dict):
+                node = self.tree.insert(parent, "end", text=key, values=("category",), open=False)
+                self.load_hierarchy(node, value)
+            elif isinstance(value, list):
+                node = self.tree.insert(parent, "end", text=key, values=("term_list",), open=False)
+                for term in value:
+                    self.tree.insert(node, "end", text=term, values=("term",))
+
+    def on_tree_select(self, event):
+        self.selected_node = self.tree.focus()
+        if self.selected_node:
+            node_type = self.tree.item(self.selected_node, "values")[0]
+            self.status.config(text=f"Selected: {self.tree.item(self.selected_node, 'text')} ({node_type})")
+
+    def add_category(self):
+        if not self.selected_node:
+            parent = ""
+        else:
+            parent = self.selected_node
+            node_type = self.tree.item(parent, "values")[0]
+            if node_type == "term":
+                messagebox.showerror("Error", "Cannot add category under a term")
+                return
+
+        name = simpledialog.askstring("Add Category", "Enter category name:")
+        if name:
+            self.tree.insert(parent, "end", text=name, values=("category",), open=True)
+            self.status.config(text=f"Added category: {name}")
+
+    def add_term(self):
+        if not self.selected_node:
+            messagebox.showerror("Error", "Please select a category to add terms to")
+            return
+
+        node_type = self.tree.item(self.selected_node, "values")[0]
+        if node_type != "term_list":
+            # If selected node is a category, find or create its term list
+            has_term_list = False
+            for child in self.tree.get_children(self.selected_node):
+                if self.tree.item(child, "values")[0] == "term_list":
+                    self.selected_node = child
+                    has_term_list = True
+                    break
+
+            if not has_term_list:
+                self.selected_node = self.tree.insert(
+                    self.selected_node, "end",
+                    text="Terms",
+                    values=("term_list",),
+                    open=True
+                )
+
+        term = simpledialog.askstring("Add Term", "Enter term:")
+        if term:
+            self.tree.insert(self.selected_node, "end", text=term, values=("term",))
+            self.status.config(text=f"Added term: {term}")
+
+    def edit_item(self):
+        if not self.selected_node:
+            return
+
+        current_text = self.tree.item(self.selected_node, "text")
+        node_type = self.tree.item(self.selected_node, "values")[0]
+
+        if node_type == "term":
+            new_text = simpledialog.askstring("Edit Term", "Edit term:", initialvalue=current_text)
+        else:
+            new_text = simpledialog.askstring("Edit Category", "Edit name:", initialvalue=current_text)
+
+        if new_text and new_text != current_text:
+            self.tree.item(self.selected_node, text=new_text)
+            self.status.config(text=f"Renamed to: {new_text}")
+
+    def remove_item(self):
+        if not self.selected_node:
+            return
+
+        node_type = self.tree.item(self.selected_node, "values")[0]
+        confirm = messagebox.askyesno(
+            "Confirm Delete",
+            f"Delete this {node_type} and all its children?",
+            icon="warning"
+        )
+        if confirm:
+            self.tree.delete(self.selected_node)
+            self.selected_node = None
+            self.status.config(text="Item deleted")
+
+    def move_up(self):
+        if not self.selected_node:
+            return
+
+        parent = self.tree.parent(self.selected_node)
+        if not parent:
+            return
+
+        siblings = list(self.tree.get_children(parent))
+        index = siblings.index(self.selected_node)
+        if index > 0:
+            self.tree.move(self.selected_node, parent, index - 1)
+            self.status.config(text="Moved item up")
+
+    def move_down(self):
+        if not self.selected_node:
+            return
+
+        parent = self.tree.parent(self.selected_node)
+        if not parent:
+            return
+
+        siblings = list(self.tree.get_children(parent))
+        index = siblings.index(self.selected_node)
+        if index < len(siblings) - 1:
+            self.tree.move(self.selected_node, parent, index + 1)
+            self.status.config(text="Moved item down")
+
+    def save_hierarchy(self):
+        file_path = filedialog.asksaveasfilename(
+            defaultextension=".py",
+            filetypes=[("Python Files", "*.py"), ("All Files", "*.*")],
+            title="Save Hierarchy"
+        )
+        if file_path:
+            hierarchy = self.reconstruct_hierarchy()
+            with open(file_path, 'w') as f:
+                f.write("CATEGORY_HIERARCHY = ")
+                json_str = json.dumps(hierarchy, indent=4)
+                # Fix some formatting issues
+                json_str = json_str.replace('": {', '": {')
+                json_str = json_str.replace('"},', '"},')
+                json_str = json_str.replace('"],', '"],')
+                f.write(json_str)
+                f.write("\n")
+            self.status.config(text=f"Saved to {file_path}")
+
+    def reconstruct_hierarchy(self, parent=""):
+        children = self.tree.get_children(parent)
+        if not children:
+            return {}
+
+        hierarchy = {}
+        for child in children:
+            node_type = self.tree.item(child, "values")[0]
+            child_text = self.tree.item(child, "text")
+
+            if node_type == "category":
+                hierarchy[child_text] = self.reconstruct_hierarchy(child)
+            elif node_type == "term_list":
+                hierarchy[child_text] = [
+                    self.tree.item(term, "text")
+                    for term in self.tree.get_children(child)
+                ]
+        return hierarchy
+
+    def expand_all(self):
+        for node in self.tree.get_children():
+            self.expand_node(node)
+
+    def expand_node(self, node):
+        self.tree.item(node, open=True)
+        for child in self.tree.get_children(node):
+            self.expand_node(child)
+
+    def collapse_all(self):
+        for node in self.tree.get_children():
+            self.collapse_node(node)
+
+    def collapse_node(self, node):
+        self.tree.item(node, open=False)
+        for child in self.tree.get_children(node):
+            self.collapse_node(child)
+
+
+# Your initial hierarchy
 CATEGORY_HIERARCHY = {
     'TECHNICAL': {
         'PROGRAMMING': {
@@ -577,233 +774,14 @@ CATEGORY_HIERARCHY = {
     }
 }
 
-
-# Flatten categories
-def flatten_categories(hierarchy, prefix=""):
-    flat = {}
-    for cat, val in hierarchy.items():
-        if isinstance(val, dict):
-            flat.update(flatten_categories(val, f"{prefix}{cat}_"))
-        else:
-            flat[f"{prefix}{cat}"] = val
-    return flat
-
-
-MAIN_CATEGORIES = flatten_categories(CATEGORY_HIERARCHY['TECHNICAL'])
-NON_TECH_CATEGORIES = flatten_categories(CATEGORY_HIERARCHY['NON_TECHNICAL'])
-ALL_CATEGORIES = {**MAIN_CATEGORIES, **NON_TECH_CATEGORIES}
-
-CATEGORY_ALIASES = {
-    "aspnet": "dotnet", "dotnetcore": "dotnet", "netcore": "dotnet",
-    "c#": "csharp", "asp.net": "aspdotnet", "oop": "object oriented programming",
-    "devops": "ci/cd", "cloud": "cloud computing", "db": "database"
-}
-
-EXPERIENCE_PATTERNS = [r"\d+\+?\s*years?"]
-DISCARD_PHRASES = ["years of experience", "experience with", "knowledge of", "understanding of"]
-
-
-def clean_skill_name(skill_name):
-    if not skill_name:
-        return ""
-    skill = skill_name.lower().strip()
-    skill = re.sub(r'\([^)]*\)', '', skill)
-    skill = re.sub(r'\[[^\]]*\]', '', skill)
-    skill = re.sub(r'^proficiency in\s*', '', skill)
-    skill = re.sub(r'[.,;:]$', '', skill)
-    return skill.strip()
-
-
-def should_discard(skill_name):
-    if len(skill_name.strip()) < 2 or len(skill_name.split()) > 6:
-        return True
-    if any(re.search(p, skill_name, re.IGNORECASE) for p in EXPERIENCE_PATTERNS):
-        return True
-    return any(p in skill_name.lower() for p in DISCARD_PHRASES)
-
-
-def normalize_skill(skill_name):
-    if not skill_name:
-        return ""
-    skill = skill_name.lower().strip()
-    skill = skill.replace(".net", "dotnet").replace("c#", "csharp")
-    skill = skill.replace("&", " and ").replace("/", " ").replace("-", " ")
-    skill = re.sub(r"[^a-z0-9\s]+", "", skill)
-    for alias, std in CATEGORY_ALIASES.items():
-        skill = re.sub(rf'\b{re.escape(alias)}\b', std, skill)
-    return re.sub(r'\s+', ' ', skill).strip()
-
-
-def should_group_together(a, b):
-    na, nb = normalize_skill(a), normalize_skill(b)
-    if na == nb or re.search(rf'\b{re.escape(na)}\b', nb) or re.search(rf'\b{re.escape(nb)}\b', na):
-        return True
-    if na[:4] == nb[:4] and len(na) <= 5 and len(nb) <= 5:
-        return True
-    return SequenceMatcher(None, na, nb).ratio() >= SIMILARITY_THRESHOLD
-
-
-def determine_primary_category(skill_name):
-    norm_skill = normalize_skill(skill_name)
-
-    # First check technical categories
-    for category, keywords in MAIN_CATEGORIES.items():
-        if any(re.search(rf'\b{re.escape(kw)}\b', norm_skill) for kw in keywords):
-            return category
-
-    # Then check non-technical categories
-    for category, keywords in NON_TECH_CATEGORIES.items():
-        if any(re.search(rf'\b{re.escape(kw)}\b', norm_skill) for kw in keywords):
-            return category
-
-    # Fallback to GENERAL_TECH subcategories
-    general_tech_cats = CATEGORY_HIERARCHY['TECHNICAL']['GENERAL_TECH']
-    for subcat, keywords in general_tech_cats.items():
-        if any(re.search(rf'\b{re.escape(kw)}\b', norm_skill) for kw in keywords):
-            return f"GENERAL_TECH_{subcat}"
-
-    return "GENERAL_TECH"
-
-
-def extract_all_skill_names_from_jobs(file_path: str) -> List[str]:
-    try:
-        with open(file_path, 'r', encoding='utf-8') as f:
-            data = json.load(f)
-        skills = set()
-        for job in data:
-            for key in ['KeySkillsRequired', 'EssentialQualifications',
-                        'EssentialTechnicalSkillQualifications', 'OtherTechnicalSkillQualifications']:
-                for skill in job.get(key, []):
-                    name = skill.get('Name')
-                    if name:
-                        cleaned = clean_skill_name(name)
-                        if cleaned and not should_discard(cleaned):
-                            skills.add(cleaned)
-        logger.info(f"Extracted {len(skills)} unique skills")
-        return list(skills)
-    except Exception as e:
-        logger.error(f"Error extracting skills: {e}", exc_info=True)
-        return []
-
-
-def create_initial_groups(skills: List[str]) -> Dict[str, List[str]]:
-    groups = {}
-    for skill in tqdm(skills, desc="Grouping skills"):
-        matched = False
-        for group in list(groups):
-            if should_group_together(skill, group):
-                groups[group].append(skill)
-                matched = True
-                break
-        if not matched:
-            groups[skill] = [skill]
-    return groups
-
-
-def consolidate_groups(groups: Dict[str, List[str]]) -> Dict[str, List[str]]:
-    consolidated = {}
-    for group_name, skills in groups.items():
-        category = determine_primary_category(group_name)
-        if len(skills) < MIN_GROUP_SIZE:
-            consolidated.setdefault(category, []).extend(skills)
-        else:
-            consolidated[group_name] = skills
-    return {k: sorted(set(v)) for k, v in consolidated.items()}
-
-
-def filter_and_reclassify_groups(groups: Dict[str, List[str]]) -> Dict[str, List[str]]:
-    final_groups = {}
-    for category, skills in groups.items():
-        for skill in skills:
-            if should_discard(skill):
-                continue
-            new_cat = determine_primary_category(skill)
-            final_groups.setdefault(new_cat, []).append(skill)
-    return {k: sorted(set(v)) for k, v in final_groups.items()}
-
-
-def save_results(output_file: str, results: Dict[str, List[str]]):
-    with open(output_file, 'w', encoding='utf-8') as f:
-        json.dump(results, f, indent=2, ensure_ascii=False)
-
-
-def save_categories_summary(groups: Dict[str, List[str]], output_path: str):
-    with open(output_path, 'w', encoding='utf-8') as f:
-        for category, skills in sorted(groups.items()):
-            f.write(f"[{category}] - {len(skills)} skills\n")
-            for skill in sorted(skills):
-                f.write(f"  - {skill}\n")
-            f.write("\n")
-
-def save_augmented_jobs_with_skills(input_file: str, final_groups: Dict[str, List[str]], array_name: str):
-    try:
-        with open(input_file, 'r', encoding='utf-8') as f:
-            jobs = json.load(f)
-
-        skill_to_category = {}
-        for category, skills in final_groups.items():
-            for skill in skills:
-                skill_to_category[skill] = category
-
-        for job in jobs:
-            category_map = {}
-
-            for skill in job.get(array_name, []):
-                name = skill.get('Name')
-                relevance = skill.get('RelevancePercentage', 0)
-
-                if name:
-                    cleaned = clean_skill_name(name)
-                    if cleaned and not should_discard(cleaned):
-                        category = skill_to_category.get(cleaned, "UNCATEGORIZED")
-                        if category not in category_map:
-                            category_map[category] = {
-                                "category": category,
-                                "relevance": relevance
-                            }
-                        else:
-                            category_map[category]["relevance"] += relevance
-
-            job['Skills'] = sorted(
-                [
-                    {"category": value["category"], "relevance": round(value["relevance"], 2)}
-                    for value in category_map.values()
-                ],
-                key=lambda x: x["relevance"],
-                reverse=True
-            )
-
-        output_path = input_file.replace(".json", "_with_skills.json")
-        with open(output_path, 'w', encoding='utf-8') as f:
-            json.dump(jobs, f, indent=2, ensure_ascii=False)
-
-        logger.info(f"Augmented job file saved to {output_path}")
-    except Exception as e:
-        logger.error(f"Error saving augmented job file: {e}", exc_info=True)
-
-
-
-
-def main(input_file=DEFAULT_INPUT, output_file=DEFAULT_OUTPUT, summary_file=DEFAULT_SUMMARY):
-    logger.info("=== Script started ===")
-    logger.info(f"Command line arguments: input={input_file}, output={output_file}, summary={summary_file}")
-
-    skills = extract_all_skill_names_from_jobs(input_file)
-    initial_groups = create_initial_groups(skills)
-    logger.info(f"Created {len(initial_groups)} initial groups")
-
-    consolidated = consolidate_groups(initial_groups)
-    logger.info(f"Consolidated into {len(consolidated)} groups")
-
-    final_groups = filter_and_reclassify_groups(consolidated)
-    logger.info(f"Final categories: {len(final_groups)}")
-
-    save_results(output_file, final_groups)
-    save_categories_summary(final_groups, summary_file)
-    save_augmented_jobs_with_skills(input_file, final_groups, 'KeySkillsRequired')
-
-    logger.info("=== Script completed successfully ===")
-
-
 if __name__ == "__main__":
-    main()
+    root = tk.Tk()
+    root.geometry("900x600")
+
+    # Add some styling
+    style = ttk.Style()
+    style.configure("Treeview", font=('Arial', 10))
+    style.configure("Treeview.Heading", font=('Arial', 10, 'bold'))
+
+    editor = CategoryEditor(root, CATEGORY_HIERARCHY)
+    root.mainloop()
