@@ -298,3 +298,8 @@ KeyError: 'name'
 2025-07-04 12:12:41,999 - __main__ - INFO - Final categories: 67
 2025-07-04 12:12:42,066 - __main__ - INFO - Augmented job file saved to processed_parse_jobs_with_skills.json
 2025-07-04 12:12:42,067 - __main__ - INFO - === Script completed successfully ===
+2025-07-04 12:40:19,496 - __main__ - INFO - === Normalization Started ===
+2025-07-04 12:40:19,521 - __main__ - INFO - Extracted 951 unique skills
+2025-07-04 12:40:57,416 - __main__ - INFO - Augmented job file saved to processed_parse_jobs_with_skills.json
+2025-07-04 12:40:57,417 - __main__ - INFO - Category hierarchy saved to category_hierarchy.json
+2025-07-04 12:40:57,417 - __main__ - INFO - === Normalization Completed ===
