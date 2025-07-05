@@ -5,9 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="86e51356-5cff-4718-8eb0-c53509b7ea5c" name="Changes" comment="refactor.">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/SkillNormalizer.py" beforeDir="false" afterPath="$PROJECT_DIR$/SkillNormalizer.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/skill_normalization.log" beforeDir="false" afterPath="$PROJECT_DIR$/skill_normalization.log" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/resume.json" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -284,7 +282,23 @@
       <option name="project" value="LOCAL" />
       <updated>1751656873586</updated>
     </task>
-    <option name="localTasksCounter" value="28" />
+    <task id="LOCAL-00028" summary="refactor.">
+      <option name="closed" value="true" />
+      <created>1751731140099</created>
+      <option name="number" value="00028" />
+      <option name="presentableId" value="LOCAL-00028" />
+      <option name="project" value="LOCAL" />
+      <updated>1751731140099</updated>
+    </task>
+    <task id="LOCAL-00029" summary="refactor.">
+      <option name="closed" value="true" />
+      <created>1751731172059</created>
+      <option name="number" value="00029" />
+      <option name="presentableId" value="LOCAL-00029" />
+      <option name="project" value="LOCAL" />
+      <updated>1751731172059</updated>
+    </task>
+    <option name="localTasksCounter" value="30" />
     <servers />
   </component>
   <component name="VcsManagerConfiguration">
